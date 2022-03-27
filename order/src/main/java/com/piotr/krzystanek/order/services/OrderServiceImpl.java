@@ -8,6 +8,9 @@ import com.piotr.krzystanek.order.exceptions.DeliveryAlreadyExistsException;
 import com.piotr.krzystanek.order.exceptions.NoDeliveryException;
 import com.piotr.krzystanek.order.exceptions.OrderNotFoundException;
 import com.piotr.krzystanek.order.persistence.OrderRepository;
+import org.openapitools.client.*;
+import org.openapitools.client.api.SyncControllerApi;
+import org.openapitools.client.model.OrderSyncRequest;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -16,13 +19,40 @@ import java.util.List;
 public class OrderServiceImpl implements OrderService {
     private final OrderRepository repository;
 
+    private final SyncControllerApi orderHistory = new SyncControllerApi();
+
     public OrderServiceImpl(OrderRepository repository) {
         this.repository = repository;
     }
 
+    private void syncOrder(Order order) {
+        var request = new OrderSyncRequest();
+
+        request.setId(order.getId());
+        request.setCustomerName(order.getCustomerName());
+
+        var delivery = order.getDelivery();
+        if (delivery != null) {
+            request.setCourierName(delivery.getCourierName());
+            request.setDeliveryStatus(delivery.getStatus().name());
+        }
+
+        request.setTotalPrice(order.getTotalPrice());
+        request.setProducts(order.getItems().stream().map(orderItem -> orderItem.getProduct().getName()).toList());
+
+        try {
+            orderHistory.sync(request);
+        }
+        catch (Exception exception) {
+            // possibly log error
+        }
+    }
+
     @Override
     public Order createOrder(String customerName, List<OrderItem> items) {
-        return repository.save(new Order(customerName, items));
+        var order = repository.save(new Order(customerName, items));
+        syncOrder(order);
+        return order;
     }
 
     @Override
@@ -40,6 +70,7 @@ public class OrderServiceImpl implements OrderService {
 
         order.setDelivery(new Delivery(courierName));
 
+        syncOrder(order);
         return repository.save(order);
     }
 
@@ -59,6 +90,7 @@ public class OrderServiceImpl implements OrderService {
 
         delivery.updateStatus(status);
 
+        syncOrder(order);
         return repository.save(order);
     }
 }
