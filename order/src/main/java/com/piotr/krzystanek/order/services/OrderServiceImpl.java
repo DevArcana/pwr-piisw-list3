@@ -8,8 +8,6 @@ import com.piotr.krzystanek.order.exceptions.DeliveryAlreadyExistsException;
 import com.piotr.krzystanek.order.exceptions.NoDeliveryException;
 import com.piotr.krzystanek.order.exceptions.OrderNotFoundException;
 import com.piotr.krzystanek.order.persistence.OrderRepository;
-import org.openapitools.client.*;
-import org.openapitools.client.api.SyncControllerApi;
 import org.openapitools.client.model.OrderSyncRequest;
 import org.springframework.stereotype.Service;
 
@@ -19,10 +17,11 @@ import java.util.List;
 public class OrderServiceImpl implements OrderService {
     private final OrderRepository repository;
 
-    private final SyncControllerApi orderHistory = new SyncControllerApi();
+    private final OrderSyncService orderSyncService;
 
-    public OrderServiceImpl(OrderRepository repository) {
+    public OrderServiceImpl(OrderRepository repository, OrderSyncService orderSyncService) {
         this.repository = repository;
+        this.orderSyncService = orderSyncService;
     }
 
     private void syncOrder(Order order) {
@@ -41,7 +40,7 @@ public class OrderServiceImpl implements OrderService {
         request.setProducts(order.getItems().stream().map(orderItem -> orderItem.getProduct().getName()).toList());
 
         try {
-            orderHistory.sync(request);
+            orderSyncService.sync(request);
         }
         catch (Exception exception) {
             // possibly log error
